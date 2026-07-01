@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bookbuddarr"
+version = "0.1.0"
+description = "Bridge BookBuddy CSV exports into Readarr and audiobook discovery workflows."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "BookBuddARR contributors" }]
+keywords = ["bookbuddy", "readarr", "audiobooks", "books", "csv"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: End Users/Desktop",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Topic :: Utilities",
+]
+
+[project.scripts]
+bookbuddarr = "bookbuddarr.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["bookbuddarr*"]
