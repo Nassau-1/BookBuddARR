@@ -92,3 +92,33 @@ def test_ingest_registry_is_incremental(tmp_path: Path) -> None:
     assert len(rows) == 1
     assert rows[0]["title"] == "Foundation"
     assert rows[0]["language_code"] == "en"
+
+    with readarr_csv.open(encoding="utf-8", newline="") as handle:
+        readarr_rows = list(csv.DictReader(handle))
+
+    assert len(readarr_rows) == 1
+    assert readarr_rows[0]["metadata_profile"] == "Standard"
+    assert readarr_rows[0]["root_folder_hint"] == "/Data/Ebooks/English"
+
+
+def test_french_readarr_queue_uses_french_profile_and_root(tmp_path: Path) -> None:
+    export = tmp_path / "export.csv"
+    registry = tmp_path / "registry.csv"
+    new_csv = tmp_path / "new.csv"
+    readarr_csv = tmp_path / "readarr.csv"
+    audio_csv = tmp_path / "audio.csv"
+    write_export(
+        export,
+        [
+            {"Title": "Dune", "Author": "Frank Herbert", "Language": "français", "ISBN": "9780441172719"},
+        ],
+    )
+
+    assert main(["ingest", str(export), "--registry", str(registry), "--new-csv", str(new_csv), "--readarr-csv", str(readarr_csv), "--audiobook-csv", str(audio_csv)]) == 0
+
+    with readarr_csv.open(encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+
+    assert rows[0]["language_code"] == "fr"
+    assert rows[0]["metadata_profile"] == "French Preferred"
+    assert rows[0]["root_folder_hint"] == "/Data/Ebooks/Francais"

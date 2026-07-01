@@ -92,9 +92,9 @@ def write_audiobook_search_queue(path: Path, records: list[BookRecord], base_url
 
 def _root_hint(record: BookRecord) -> str:
     if record.language_code == "fr":
-        return "/Data/Ebooks/PublicDomain/Francais"
+        return "/Data/Ebooks/Francais"
     if record.language_code == "en":
-        return "/Data/Ebooks/PublicDomain/English"
+        return "/Data/Ebooks/English"
     return "/Data/Ebooks"
 
 

@@ -62,17 +62,27 @@ The next run with a later BookBuddy export uses the same registry and outputs on
 
 `readarr_queue.csv` is a review/import queue. It includes title, author, ISBN, language code, and suggested Readarr metadata/root-folder hints.
 
+Default root hints are:
+
+- French: `/Data/Ebooks/Francais`
+- English: `/Data/Ebooks/English`
+- Unknown language: `/Data/Ebooks`
+
 Direct Readarr API import is intentionally not enabled in v0.1 because book matching can be ambiguous. The safe workflow is:
 
 1. Review the queue.
 2. Confirm language and edition.
 3. Add/search in Readarr.
 
+In live testing, Readarr lookup could resolve a French ISBN to English/original metadata. BookBuddARR therefore preserves the BookBuddy language intent in the queue instead of trusting lookup metadata blindly.
+
 ### Audiobook Discovery
 
 `audiobook_search_queue.csv` contains language-aware audiobook queries and review URLs.
 
 These are review targets, not automated grabs. Only use them for content you have the right to access or redistribute.
+
+AudioBookBay Automated is not a Prowlarr-style indexer. It is a separate search/download helper. BookBuddARR currently generates review queues for it instead of pretending it can be routed through Readarr like a normal Torznab/Newznab indexer.
 
 ## Why Not Autobrr First?
 
