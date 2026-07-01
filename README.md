@@ -21,11 +21,16 @@ BookBuddARR does not download media by itself. It creates structured queues and 
 - Preserves language intent:
   - `français` / French books become `fr`.
   - `anglais` / English books become `en`.
+- Applies audiobook-first rules:
+  - French scanned editions target French audiobook results and `/Data/Audiobooks/Francais`.
+  - English scanned editions target English audiobook results and `/Data/Audiobooks/English`.
+  - Unknown-language books require manual language review.
 - Generates:
   - `new_books.csv`
   - `readarr_queue.csv`
   - `audiobook_search_queue.csv`
   - optional summary JSON
+- Can run a small Torznab-compatible AudioBookBay bridge for Prowlarr testing.
 
 ## Install
 
@@ -58,6 +63,18 @@ The next run with a later BookBuddy export uses the same registry and outputs on
 
 ## Stack Integration
 
+### Audiobooks First
+
+The primary workflow is audiobook discovery. Ebooks remain a review queue for later.
+
+`audiobook_search_queue.csv` includes:
+
+- `wanted_language`
+- `language_policy`
+- primary and alternate search queries
+- Audiobookshelf/qBittorrent root hint
+- manual review flag
+
 ### Readarr
 
 `readarr_queue.csv` is a review/import queue. It includes title, author, ISBN, language code, and suggested Readarr metadata/root-folder hints.
@@ -83,6 +100,31 @@ In live testing, Readarr lookup could resolve a French ISBN to English/original 
 These are review targets, not automated grabs. Only use them for content you have the right to access or redistribute.
 
 AudioBookBay Automated is not a Prowlarr-style indexer. It is a separate search/download helper. BookBuddARR currently generates review queues for it instead of pretending it can be routed through Readarr like a normal Torznab/Newznab indexer.
+
+### AudioBookBay Torznab Bridge
+
+BookBuddARR can expose AudioBookBay search through a small Torznab-compatible bridge:
+
+```powershell
+bookbuddarr torznab-serve --bind 127.0.0.1 --port 8765 --page-limit 2 --api-key "local-dev-key"
+```
+
+Then add a Generic Torznab indexer in Prowlarr:
+
+- URL: `http://<host>:8765/api`
+- API Key: the value passed with `--api-key`
+- Categories: audiobook/books as desired
+
+The bridge searches and returns Torznab XML. It does not send anything to qBittorrent. Grab links are proxied through `t=get` and redirect to a magnet only when the downstream app explicitly requests a result.
+
+Keep this disabled or LAN-only until the matching and language rules are validated.
+
+Docker:
+
+```powershell
+docker build -t bookbuddarr:local .
+docker run --rm -p 8765:8765 bookbuddarr:local bookbuddarr torznab-serve --bind 0.0.0.0 --port 8765 --api-key "local-dev-key"
+```
 
 ## Why Not Autobrr First?
 

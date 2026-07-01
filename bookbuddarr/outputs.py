@@ -5,6 +5,7 @@ from pathlib import Path
 from urllib.parse import quote_plus
 
 from .models import BookRecord
+from .rules import audiobook_rule
 
 
 NEW_FIELDS = [
@@ -43,7 +44,11 @@ AUDIOBOOK_SEARCH_FIELDS = [
     "author",
     "isbn",
     "language_code",
+    "wanted_language",
+    "language_policy",
     "query",
+    "alternate_query",
+    "root_folder_hint",
     "audiobookbay_search_url",
     "manual_review_required",
 ]
@@ -75,16 +80,20 @@ def write_readarr_queue(path: Path, records: list[BookRecord]) -> None:
 def write_audiobook_search_queue(path: Path, records: list[BookRecord], base_url: str) -> None:
     rows = []
     for record in records:
-        query = record.audiobook_query()
+        rule = audiobook_rule(record)
         rows.append(
             {
                 "title": record.title,
                 "author": record.author,
                 "isbn": record.isbn,
                 "language_code": record.language_code,
-                "query": query,
-                "audiobookbay_search_url": f"{base_url.rstrip('/')}/?s={quote_plus(query)}",
-                "manual_review_required": "true",
+                "wanted_language": rule.wanted_language,
+                "language_policy": rule.language_policy,
+                "query": rule.query,
+                "alternate_query": rule.alternate_query,
+                "root_folder_hint": rule.root_folder_hint,
+                "audiobookbay_search_url": f"{base_url.rstrip('/')}/?s={quote_plus(rule.query)}",
+                "manual_review_required": str(rule.manual_review_required).lower(),
             }
         )
     _write_rows(path, AUDIOBOOK_SEARCH_FIELDS, rows)

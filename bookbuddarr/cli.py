@@ -7,6 +7,7 @@ from pathlib import Path
 from .bookbuddy import dedupe_records, read_bookbuddy_export
 from .outputs import write_audiobook_search_queue, write_new_records, write_readarr_queue
 from .registry import load_registry_ids, read_registry_rows, write_registry
+from .torznab import serve as serve_torznab
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -14,6 +15,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "ingest":
         return run_ingest(args)
+    if args.command == "torznab-serve":
+        serve_torznab(args)
+        return 0
     parser.error("unknown command")
     return 2
 
@@ -33,6 +37,13 @@ def build_parser() -> argparse.ArgumentParser:
     ingest.add_argument("--audiobookbay-base-url", default="https://audiobookbay.lu")
     ingest.add_argument("--no-update-registry", action="store_true")
     ingest.add_argument("--summary-json", type=Path)
+    torznab = sub.add_parser("torznab-serve", help="Expose AudioBookBay search as a Torznab-compatible bridge.")
+    torznab.add_argument("--bind", default="127.0.0.1")
+    torznab.add_argument("--port", type=int, default=8765)
+    torznab.add_argument("--hostname", default="audiobookbay.lu")
+    torznab.add_argument("--page-limit", type=int, default=2)
+    torznab.add_argument("--timeout", type=int, default=15)
+    torznab.add_argument("--api-key", default="")
     return parser
 
 

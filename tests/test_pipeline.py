@@ -5,6 +5,8 @@ from pathlib import Path
 
 from bookbuddarr.bookbuddy import dedupe_records, read_bookbuddy_export
 from bookbuddarr.cli import main
+from bookbuddarr.rules import audiobook_rule
+from bookbuddarr.torznab import AudioBookBayClient, parse_size_bytes, render_caps, render_rss
 
 
 HEADERS = [
@@ -122,3 +124,54 @@ def test_french_readarr_queue_uses_french_profile_and_root(tmp_path: Path) -> No
     assert rows[0]["language_code"] == "fr"
     assert rows[0]["metadata_profile"] == "French Preferred"
     assert rows[0]["root_folder_hint"] == "/Data/Ebooks/Francais"
+
+
+def test_audiobook_rules_preserve_language_intent(tmp_path: Path) -> None:
+    export = tmp_path / "export.csv"
+    write_export(
+        export,
+        [
+            {"Title": "Dune", "Author": "Frank Herbert", "Language": "français", "ISBN": "9780441172719"},
+            {"Title": "Foundation", "Author": "Isaac Asimov", "Language": "anglais", "ISBN": "9780553293357"},
+        ],
+    )
+    records = read_bookbuddy_export(export)
+
+    french = audiobook_rule(records[0])
+    english = audiobook_rule(records[1])
+
+    assert french.wanted_language == "French"
+    assert french.root_folder_hint == "/Data/Audiobooks/Francais"
+    assert "French audiobook" in french.query
+    assert english.wanted_language == "English"
+    assert english.root_folder_hint == "/Data/Audiobooks/English"
+
+
+def test_torznab_xml_helpers() -> None:
+    caps = render_caps().decode("utf-8")
+    assert "<caps>" in caps
+    assert 'name="Audiobook"' in caps
+    assert parse_size_bytes("1.5 GB") == 1610612736
+
+
+def test_audiobookbay_client_parses_search_html() -> None:
+    html = """
+    <div class="post">
+      <div class="postTitle"><h2><a href="/abss/dune-frank-herbert/">Dune - Frank Herbert</a></h2></div>
+      <div class="postInfo">Language: French Keywords: science fiction</div>
+      <div class="postContent"><p style="text-align:center">Posted: Wed, 01 Jul 2026 00:00:00 GMT<br>
+      Format:<span> M4B </span> Bitrate:<span> 128 Kbps </span> File Size:<span> 1.2 </span> GB</p></div>
+    </div>
+    """
+
+    class FakeClient(AudioBookBayClient):
+        def _get_text(self, url: str) -> str:
+            return html
+
+    results = FakeClient(page_limit=1).search("dune")
+    rss = render_rss(results, "http://127.0.0.1:8765/api", "dune").decode("utf-8")
+
+    assert len(results) == 1
+    assert results[0].language == "French"
+    assert "Dune - Frank Herbert" in rss
+    assert "torznab:attr" in rss

@@ -11,6 +11,7 @@ flowchart LR
   D --> F["New books CSV"]
   D --> G["Readarr review queue"]
   D --> H["Audiobook search queue"]
+  H --> I["Optional Torznab bridge"]
 ```
 
 ## Components
@@ -19,6 +20,8 @@ flowchart LR
 - `bookbuddarr.normalize`: text, ISBN, and language normalization.
 - `bookbuddarr.registry`: persistent processed-record registry.
 - `bookbuddarr.outputs`: generated CSV queues.
+- `bookbuddarr.rules`: audiobook-first language and routing rules.
+- `bookbuddarr.torznab`: optional Torznab-compatible AudioBookBay bridge.
 - `bookbuddarr.cli`: command-line interface.
 
 ## Identity Model
@@ -33,5 +36,7 @@ This avoids reprocessing the same scanned edition on later BookBuddy exports whi
 ## Integration Boundary
 
 BookBuddARR intentionally does not download or grab releases. It produces review queues for downstream tools such as Readarr and audiobook discovery/search services.
+
+The optional Torznab bridge exposes search results for Prowlarr-style testing. It does not push anything to a download client. Downstream tools must explicitly request a result before the bridge resolves a magnet.
 
 This keeps the first version deterministic, auditable, and safe for public release.
