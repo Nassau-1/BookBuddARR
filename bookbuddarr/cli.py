@@ -44,6 +44,7 @@ def build_parser() -> argparse.ArgumentParser:
     torznab.add_argument("--page-limit", type=int, default=2)
     torznab.add_argument("--timeout", type=int, default=15)
     torznab.add_argument("--api-key", default="")
+    torznab.add_argument("--default-query", default="audiobook")
     return parser
 
 

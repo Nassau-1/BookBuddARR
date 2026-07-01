@@ -175,3 +175,10 @@ def test_audiobookbay_client_parses_search_html() -> None:
     assert results[0].language == "French"
     assert "Dune - Frank Herbert" in rss
     assert "torznab:attr" in rss
+
+
+def test_torznab_cli_exposes_default_query() -> None:
+    from bookbuddarr.cli import build_parser
+
+    args = build_parser().parse_args(["torznab-serve"])
+    assert args.default_query == "audiobook"

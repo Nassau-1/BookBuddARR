@@ -157,6 +157,7 @@ def render_rss(results: Iterable[AbbResult], self_url: str, query: str) -> bytes
 class TorznabHandler(BaseHTTPRequestHandler):
     client: AudioBookBayClient
     api_key: str
+    default_query: str
 
     def do_GET(self) -> None:
         parsed = urllib.parse.urlparse(self.path)
@@ -181,7 +182,7 @@ class TorznabHandler(BaseHTTPRequestHandler):
             self.send_header("Location", magnet)
             self.end_headers()
             return
-        query = params.get("q", [""])[0] or params.get("term", [""])[0]
+        query = params.get("q", [""])[0] or params.get("term", [""])[0] or self.default_query
         results = self.client.search(query) if query else []
         self._send_xml(render_rss(results, self._self_url(parsed.path), query))
 
@@ -205,7 +206,7 @@ def serve(args: argparse.Namespace) -> None:
     handler = type(
         "ConfiguredTorznabHandler",
         (TorznabHandler,),
-        {"client": client, "api_key": args.api_key},
+        {"client": client, "api_key": args.api_key, "default_query": args.default_query},
     )
     server = ThreadingHTTPServer((args.bind, args.port), handler)
     print(f"BookBuddARR Torznab bridge listening on {args.bind}:{args.port}")

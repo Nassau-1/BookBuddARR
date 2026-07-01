@@ -106,7 +106,7 @@ AudioBookBay Automated is not a Prowlarr-style indexer. It is a separate search/
 BookBuddARR can expose AudioBookBay search through a small Torznab-compatible bridge:
 
 ```powershell
-bookbuddarr torznab-serve --bind 127.0.0.1 --port 8765 --page-limit 2 --api-key "local-dev-key"
+bookbuddarr torznab-serve --bind 127.0.0.1 --port 8765 --page-limit 2 --api-key "local-dev-key" --default-query "audiobook"
 ```
 
 Then add a Generic Torznab indexer in Prowlarr:
@@ -117,13 +117,15 @@ Then add a Generic Torznab indexer in Prowlarr:
 
 The bridge searches and returns Torznab XML. It does not send anything to qBittorrent. Grab links are proxied through `t=get` and redirect to a magnet only when the downstream app explicitly requests a result.
 
+Prowlarr validates Generic Torznab indexers by running a query without a user search term. `--default-query` controls the fallback query for that validation/RSS path.
+
 Keep this disabled or LAN-only until the matching and language rules are validated.
 
 Docker:
 
 ```powershell
 docker build -t bookbuddarr:local .
-docker run --rm -p 8765:8765 bookbuddarr:local bookbuddarr torznab-serve --bind 0.0.0.0 --port 8765 --api-key "local-dev-key"
+docker run --rm -p 8765:8765 bookbuddarr:local bookbuddarr torznab-serve --bind 0.0.0.0 --port 8765 --api-key "local-dev-key" --default-query "audiobook"
 ```
 
 ## Why Not Autobrr First?
