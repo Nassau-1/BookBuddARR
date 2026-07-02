@@ -868,6 +868,72 @@ def test_workflow_groups_completed_multipart_downloads(tmp_path: Path, monkeypat
     assert (grouped / part2.name / "b.m4b").exists()
 
 
+def test_workflow_groups_when_bookbuddy_title_is_itself_a_part(tmp_path: Path, monkeypatch) -> None:
+    export = tmp_path / "export.csv"
+    part1 = tmp_path / "completed" / "Ainsi parlait Zarathoustra 1 - Le declin"
+    part2 = tmp_path / "completed" / "Ainsi parlait Zarathoustra 2 - Le Grand Midi"
+    part1.mkdir(parents=True)
+    part2.mkdir(parents=True)
+    (part1 / "a.m4b").write_text("synthetic", encoding="utf-8")
+    (part2 / "b.m4b").write_text("synthetic", encoding="utf-8")
+    target_root = tmp_path / "Audiobooks" / "Francais"
+    write_export(
+        export,
+        [
+            {
+                "Title": "Ainsi parlait Zarathoustra 1 - Le declin",
+                "Author": "Friedrich Nietzsche",
+                "Language": "francais",
+                "ISBN": "9780000000003",
+            }
+        ],
+    )
+
+    monkeypatch.setattr(
+        "bookbuddarr.workflow.prowlarr_search",
+        lambda settings, query: [
+            {
+                "title": "Ainsi parlait Zarathoustra 1 - Le declin",
+                "guid": "guid-1",
+                "indexerId": 9,
+                "infoUrl": "https://example.test/zara-1",
+                "language": "French",
+                "protocol": "torrent",
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        "bookbuddarr.workflow.qbit_torrents",
+        lambda settings: [
+            {"name": part1.name, "content_path": str(part1), "progress": 1, "state": "uploading"},
+            {"name": part2.name, "content_path": str(part2), "progress": 1, "state": "uploading"},
+        ],
+    )
+    summary = run_monitored_workflow(
+        export,
+        paths=WorkflowPaths(
+            registry=tmp_path / "registry.csv",
+            new_csv=tmp_path / "new.csv",
+            readarr_csv=tmp_path / "readarr.csv",
+            audiobook_csv=tmp_path / "audio.csv",
+            matches_csv=tmp_path / "matches.csv",
+            workflow_status_csv=tmp_path / "workflow.csv",
+        ),
+        stack=StackSettings.from_mapping(
+            {
+                "prowlarr_url": "http://prowlarr.test",
+                "prowlarr_api_key": "secret",
+                "qbittorrent_url": "http://qbit.test",
+                "audiobook_root_fr": str(target_root),
+                "download_mode": "approved_or_eligible",
+                "candidate_score_threshold": 1,
+            }
+        ),
+    )
+
+    assert summary["states"] == {"complete_grouped": 1}
+
+
 def test_audiobook_root_map_overrides_default_roots(tmp_path: Path) -> None:
     export = tmp_path / "export.csv"
     registry = tmp_path / "registry.csv"

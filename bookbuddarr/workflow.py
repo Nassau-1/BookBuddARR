@@ -97,14 +97,13 @@ def run_monitored_workflow(
         if not rows_for_book:
             status_rows.append(_status(queue_row, "blocked", details="no_candidates_found"))
             continue
+        completed_parts = _completed_part_downloads(stack, queue_row.title) if stack.qbittorrent_url and not dry_run else {}
+        if len(completed_parts) >= 2:
+            status_rows.append(_import_completed_part_group(queue_row, rows_for_book[0], completed_parts, stack))
+            continue
         if selected is None:
             multipart = _multipart_status(rows_for_book[0], rows_for_book)
             if multipart["state"] == "needs_parts":
-                completed_parts = _completed_part_downloads(stack, queue_row.title) if stack.qbittorrent_url and not dry_run else {}
-                if len(completed_parts) >= 2:
-                    grouped = _import_completed_part_group(queue_row, rows_for_book[0], completed_parts, stack)
-                    status_rows.append(grouped)
-                    continue
                 status_rows.append(
                     _status(
                         queue_row,
@@ -120,10 +119,6 @@ def run_monitored_workflow(
             continue
         multipart = _multipart_status(selected, rows_for_book)
         if multipart["state"] == "needs_parts":
-            completed_parts = _completed_part_downloads(stack, queue_row.title) if stack.qbittorrent_url and not dry_run else {}
-            if len(completed_parts) >= 2:
-                status_rows.append(_import_completed_part_group(queue_row, selected, completed_parts, stack))
-                continue
             status_rows.append(_status(queue_row, "needs_parts", candidate=selected, details=multipart["details"], parts_found=multipart["parts_found"], parts_missing=multipart["parts_missing"]))
             continue
         completed = find_completed_download(stack, selected.get("candidate_title", "")) if stack.qbittorrent_url and not dry_run else None
@@ -293,8 +288,8 @@ def _download_path(torrent: dict[str, Any]) -> Path | None:
 
 def _completed_part_downloads(stack: StackSettings, book_title: str) -> dict[str, Path]:
     completed: dict[str, Path] = {}
-    book_key = _simple_key(book_title)
-    if not book_key:
+    book_keys = {key for key in {_simple_key(book_title), _simple_key(_strip_part_suffix(book_title))} if key}
+    if not book_keys:
         return completed
     try:
         torrents = qbit_torrents(stack)
@@ -304,7 +299,8 @@ def _completed_part_downloads(stack: StackSettings, book_title: str) -> dict[str
         name = str(torrent.get("name") or "")
         state = str(torrent.get("state") or "")
         progress = float(torrent.get("progress") or 0)
-        if book_key not in _simple_key(name):
+        torrent_key = _simple_key(name)
+        if not any(book_key in torrent_key for book_key in book_keys):
             continue
         marker = _part_marker(name)
         if not marker:
@@ -315,6 +311,19 @@ def _completed_part_downloads(stack: StackSettings, book_title: str) -> dict[str
         if path is not None:
             completed[marker] = path
     return completed
+
+
+def _strip_part_suffix(title: str) -> str:
+    import re
+
+    patterns = [
+        r"\s+\b(?:vol|volume|tome|part|partie|book|livre|disc|disque|cd)\s*(?:0?[1-9]|[ivxlcdm]+)\b.*$",
+        r"\s+\b(?:0?[1-9]|[ivxlcdm]+)\s*(?:-|:)\s+.*$",
+    ]
+    value = title
+    for pattern in patterns:
+        value = re.sub(pattern, "", value, flags=re.I).strip()
+    return value or title
 
 
 def _import_completed_part_group(
