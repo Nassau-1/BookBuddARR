@@ -79,9 +79,12 @@ def run_monitored_workflow(
     _event(events, activity_path, "ingested", {"new_records": len(plan.new_records), "registry_updated": update_registry})
 
     queue_rows = read_search_queue(paths.audiobook_csv)
+    existing_review_rows = read_matches(paths.matches_csv)
     matches = _search_workflow_candidates(queue_rows, paths=paths, stack=stack, limit_per_book=limit_per_book)
     write_matches(paths.matches_csv, matches)
-    persisted_matches = read_matches(paths.matches_csv)
+    persisted_matches = _restore_existing_approved_rows(read_matches(paths.matches_csv), existing_review_rows, queue_rows)
+    if len(persisted_matches) > len(read_matches(paths.matches_csv)):
+        _write_match_dicts(paths.matches_csv, persisted_matches)
     _event(events, activity_path, "searched", {"queue_rows": len(queue_rows), "candidate_rows": len(persisted_matches)})
 
     status_rows = []
@@ -200,6 +203,32 @@ def _select_rows(rows: list[dict[str, str]], stack: StackSettings) -> dict[str, 
         if _eligible(row, stack):
             selected[row["record_id"]] = row
     return selected
+
+
+def _restore_existing_approved_rows(
+    new_rows: list[dict[str, str]],
+    existing_rows: list[dict[str, str]],
+    queue_rows: list[Any],
+) -> list[dict[str, str]]:
+    queue_ids = {row.record_id for row in queue_rows}
+    seen = {(row.get("record_id", ""), row.get("candidate_url", "")) for row in new_rows}
+    restored = list(new_rows)
+    for row in existing_rows:
+        key = (row.get("record_id", ""), row.get("candidate_url", ""))
+        if row.get("record_id") in queue_ids and row.get("decision_status") == "approved" and key not in seen:
+            restored.append(row)
+            seen.add(key)
+    return restored
+
+
+def _write_match_dicts(path: Path, rows: list[dict[str, str]]) -> None:
+    from .audiobook_search import MATCH_FIELDS
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=MATCH_FIELDS)
+        writer.writeheader()
+        writer.writerows([{field: row.get(field, "") for field in MATCH_FIELDS} for row in rows])
 
 
 def _eligible(row: dict[str, str], stack: StackSettings) -> bool:

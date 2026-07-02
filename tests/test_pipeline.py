@@ -705,6 +705,95 @@ def test_workflow_imports_existing_completed_download_without_grab(tmp_path: Pat
     assert (target_root / "Dune" / "track.m4b").exists()
 
 
+def test_workflow_preserves_existing_approval_when_search_returns_no_rows(tmp_path: Path, monkeypatch) -> None:
+    export = tmp_path / "export.csv"
+    completed = tmp_path / "completed" / "Dune - Frank Herbert VF"
+    completed.mkdir(parents=True)
+    (completed / "track.m4b").write_text("synthetic", encoding="utf-8")
+    target_root = tmp_path / "Audiobooks" / "Francais"
+    matches = tmp_path / "matches.csv"
+    write_export(
+        export,
+        [
+            {"Title": "Dune", "Author": "Frank Herbert", "Language": "francais", "ISBN": "9780441172719"},
+        ],
+    )
+    with matches.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=[
+                "record_id",
+                "book_title",
+                "book_author",
+                "book_language_code",
+                "search_query",
+                "candidate_title",
+                "candidate_language",
+                "candidate_language_code",
+                "candidate_url",
+                "candidate_guid",
+                "prowlarr_indexer_id",
+                "download_protocol",
+                "download_size",
+                "score",
+                "candidate_completeness_status",
+                "candidate_completeness_notes",
+                "decision_status",
+                "notes",
+            ],
+        )
+        writer.writeheader()
+        writer.writerow(
+            {
+                "record_id": "isbn:9780441172719",
+                "book_title": "Dune",
+                "book_author": "Frank Herbert",
+                "book_language_code": "fr",
+                "search_query": "Dune Frank Herbert French audiobook",
+                "candidate_title": "Dune - Frank Herbert VF",
+                "candidate_language": "French",
+                "candidate_language_code": "fr",
+                "candidate_url": "https://example.test/dune",
+                "score": "90",
+                "candidate_completeness_status": "unknown",
+                "candidate_completeness_notes": "",
+                "decision_status": "approved",
+                "notes": "already reviewed",
+            }
+        )
+
+    monkeypatch.setattr("bookbuddarr.workflow.prowlarr_search", lambda settings, query: [])
+    monkeypatch.setattr(
+        "bookbuddarr.workflow.find_completed_download",
+        lambda settings, title: {"name": "Dune - Frank Herbert VF", "content_path": str(completed), "progress": 1},
+    )
+    summary = run_monitored_workflow(
+        export,
+        paths=WorkflowPaths(
+            registry=tmp_path / "registry.csv",
+            new_csv=tmp_path / "new.csv",
+            readarr_csv=tmp_path / "readarr.csv",
+            audiobook_csv=tmp_path / "audio.csv",
+            matches_csv=matches,
+            workflow_status_csv=tmp_path / "workflow.csv",
+        ),
+        stack=StackSettings.from_mapping(
+            {
+                "prowlarr_url": "http://prowlarr.test",
+                "prowlarr_api_key": "secret",
+                "qbittorrent_url": "http://qbit.test",
+                "audiobook_root_fr": str(target_root),
+                "download_mode": "approved_only",
+            }
+        ),
+    )
+
+    assert summary["states"] == {"complete": 1}
+    with matches.open(encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    assert rows[0]["decision_status"] == "approved"
+
+
 def test_audiobook_root_map_overrides_default_roots(tmp_path: Path) -> None:
     export = tmp_path / "export.csv"
     registry = tmp_path / "registry.csv"
