@@ -23,8 +23,10 @@ from .stack import (
     append_activity,
     find_completed_download,
     import_download,
+    import_download_group,
     prowlarr_grab,
     prowlarr_search,
+    qbit_torrents,
     verify_audiobookshelf_path,
 )
 
@@ -98,6 +100,11 @@ def run_monitored_workflow(
         if selected is None:
             multipart = _multipart_status(rows_for_book[0], rows_for_book)
             if multipart["state"] == "needs_parts":
+                completed_parts = _completed_part_downloads(stack, queue_row.title) if stack.qbittorrent_url and not dry_run else {}
+                if len(completed_parts) >= 2:
+                    grouped = _import_completed_part_group(queue_row, rows_for_book[0], completed_parts, stack)
+                    status_rows.append(grouped)
+                    continue
                 status_rows.append(
                     _status(
                         queue_row,
@@ -113,6 +120,10 @@ def run_monitored_workflow(
             continue
         multipart = _multipart_status(selected, rows_for_book)
         if multipart["state"] == "needs_parts":
+            completed_parts = _completed_part_downloads(stack, queue_row.title) if stack.qbittorrent_url and not dry_run else {}
+            if len(completed_parts) >= 2:
+                status_rows.append(_import_completed_part_group(queue_row, selected, completed_parts, stack))
+                continue
             status_rows.append(_status(queue_row, "needs_parts", candidate=selected, details=multipart["details"], parts_found=multipart["parts_found"], parts_missing=multipart["parts_missing"]))
             continue
         completed = find_completed_download(stack, selected.get("candidate_title", "")) if stack.qbittorrent_url and not dry_run else None
@@ -278,6 +289,58 @@ def _download_path(torrent: dict[str, Any]) -> Path | None:
     save_path = str(torrent.get("save_path") or torrent.get("savePath") or "").strip()
     name = str(torrent.get("name") or "").strip()
     return Path(save_path) / name if save_path and name else None
+
+
+def _completed_part_downloads(stack: StackSettings, book_title: str) -> dict[str, Path]:
+    completed: dict[str, Path] = {}
+    book_key = _simple_key(book_title)
+    if not book_key:
+        return completed
+    try:
+        torrents = qbit_torrents(stack)
+    except Exception:
+        return completed
+    for torrent in torrents:
+        name = str(torrent.get("name") or "")
+        state = str(torrent.get("state") or "")
+        progress = float(torrent.get("progress") or 0)
+        if book_key not in _simple_key(name):
+            continue
+        marker = _part_marker(name)
+        if not marker:
+            continue
+        if progress < 1 and not state.lower().startswith(("upload", "stalledup", "pausedup")):
+            continue
+        path = _download_path(torrent)
+        if path is not None:
+            completed[marker] = path
+    return completed
+
+
+def _import_completed_part_group(
+    queue_row: Any,
+    candidate: dict[str, str],
+    completed_parts: dict[str, Path],
+    stack: StackSettings,
+) -> dict[str, str]:
+    root = Path(stack.root_for_language(queue_row.language_code))
+    imported = import_download_group(list(completed_parts.values()), root, queue_row.title, mode=stack.import_mode)
+    if not imported.get("ok"):
+        return _status(queue_row, "blocked", candidate=candidate, details=str(imported.get("reason")))
+    verified = verify_audiobookshelf_path(Path(str(imported.get("target"))))
+    return _status(
+        queue_row,
+        "complete_grouped" if verified.get("ok") else "blocked",
+        candidate=candidate,
+        details=str(verified.get("state") or verified.get("reason")),
+        target_path=str(imported.get("target", "")),
+        parts_found=",".join(sorted(completed_parts)),
+        parts_missing="",
+    )
+
+
+def _simple_key(value: str) -> str:
+    return " ".join(value.lower().replace("_", " ").replace("-", " ").split())
 
 
 def _status(

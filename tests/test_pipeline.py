@@ -794,6 +794,80 @@ def test_workflow_preserves_existing_approval_when_search_returns_no_rows(tmp_pa
     assert rows[0]["decision_status"] == "approved"
 
 
+def test_workflow_groups_completed_multipart_downloads(tmp_path: Path, monkeypatch) -> None:
+    export = tmp_path / "export.csv"
+    part1 = tmp_path / "completed" / "Ainsi parlait Zarathoustra 1 - Le declin"
+    part2 = tmp_path / "completed" / "Ainsi parlait Zarathoustra 2 - Le Grand Midi"
+    part1.mkdir(parents=True)
+    part2.mkdir(parents=True)
+    (part1 / "a.m4b").write_text("synthetic", encoding="utf-8")
+    (part2 / "b.m4b").write_text("synthetic", encoding="utf-8")
+    target_root = tmp_path / "Audiobooks" / "Francais"
+    write_export(
+        export,
+        [
+            {
+                "Title": "Ainsi parlait Zarathoustra",
+                "Author": "Friedrich Nietzsche",
+                "Language": "francais",
+                "ISBN": "9780000000003",
+            }
+        ],
+    )
+
+    def fake_search(settings: StackSettings, query: str):
+        return [
+            {
+                "title": "Ainsi parlait Zarathoustra 1 - Le declin",
+                "guid": "guid-1",
+                "indexerId": 9,
+                "infoUrl": "https://example.test/zara-1",
+                "language": "French",
+                "protocol": "torrent",
+            }
+        ]
+
+    def fake_torrents(settings: StackSettings):
+        return [
+            {"name": part1.name, "content_path": str(part1), "progress": 1, "state": "uploading"},
+            {"name": part2.name, "content_path": str(part2), "progress": 1, "state": "uploading"},
+        ]
+
+    monkeypatch.setattr("bookbuddarr.workflow.prowlarr_search", fake_search)
+    monkeypatch.setattr("bookbuddarr.workflow.qbit_torrents", fake_torrents)
+    summary = run_monitored_workflow(
+        export,
+        paths=WorkflowPaths(
+            registry=tmp_path / "registry.csv",
+            new_csv=tmp_path / "new.csv",
+            readarr_csv=tmp_path / "readarr.csv",
+            audiobook_csv=tmp_path / "audio.csv",
+            matches_csv=tmp_path / "matches.csv",
+            workflow_status_csv=tmp_path / "workflow.csv",
+        ),
+        stack=StackSettings.from_mapping(
+            {
+                "prowlarr_url": "http://prowlarr.test",
+                "prowlarr_api_key": "secret",
+                "qbittorrent_url": "http://qbit.test",
+                "audiobook_root_fr": str(target_root),
+                "download_mode": "approved_or_eligible",
+                "candidate_score_threshold": 1,
+            }
+        ),
+    )
+
+    with (tmp_path / "workflow.csv").open(encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    grouped = target_root / "Ainsi parlait Zarathoustra"
+
+    assert summary["states"] == {"complete_grouped": 1}
+    assert rows[0]["state"] == "complete_grouped"
+    assert rows[0]["parts_found"] == "1,2"
+    assert (grouped / part1.name / "a.m4b").exists()
+    assert (grouped / part2.name / "b.m4b").exists()
+
+
 def test_audiobook_root_map_overrides_default_roots(tmp_path: Path) -> None:
     export = tmp_path / "export.csv"
     registry = tmp_path / "registry.csv"

@@ -173,6 +173,33 @@ def import_download(source_path: Path, target_root: Path, book_title: str, *, mo
     return {"ok": True, "state": "imported", "target": str(target), "files": _count_files(target)}
 
 
+def import_download_group(source_paths: list[Path], target_root: Path, book_title: str, *, mode: str = "copy") -> dict[str, Any]:
+    if mode == "none":
+        return {"ok": True, "state": "import_skipped", "target": str(target_root)}
+    missing = [str(path) for path in source_paths if not path.exists()]
+    if missing:
+        return {"ok": False, "state": "blocked", "reason": "download_path_missing", "missing": missing}
+    target_root.mkdir(parents=True, exist_ok=True)
+    target = target_root / _safe_folder_name(book_title)
+    target.mkdir(parents=True, exist_ok=True)
+    for source_path in source_paths:
+        if source_path.is_dir():
+            destination = target / _safe_folder_name(source_path.name)
+            if destination.exists():
+                shutil.rmtree(destination)
+            if mode == "move":
+                shutil.move(str(source_path), str(destination))
+            else:
+                shutil.copytree(source_path, destination)
+        else:
+            destination = target / source_path.name
+            if mode == "move":
+                shutil.move(str(source_path), str(destination))
+            else:
+                shutil.copy2(source_path, destination)
+    return {"ok": True, "state": "imported_group", "target": str(target), "files": _count_files(target)}
+
+
 def verify_audiobookshelf_path(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {"ok": False, "state": "blocked", "reason": "target_not_visible", "path": str(path)}
