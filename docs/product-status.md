@@ -1,10 +1,10 @@
 # Product Status
 
-Date: 2026-07-01
+Date: 2026-07-02
 
 ## Current Stage
 
-BookBuddARR is a **v1 integrated POC**, not yet a finished product.
+BookBuddARR is a **v1 approval-gated Docker product candidate with prior actual-stack live validation and a new monitored automation flow awaiting final Service validation**.
 
 It has real working pieces:
 
@@ -13,19 +13,35 @@ It has real working pieces:
 - ISBN-first deduplication.
 - Language-aware audiobook routing rules.
 - Generated audiobook review queue.
+- Dry-run Torznab audiobook candidate search.
+- Local CSV audiobook candidate review state.
+- Explicit candidate list/approve/reject/export commands.
+- Approved candidate CSV export and export-only Audiobookshelf JSON.
+- Candidate review state preservation across search reruns.
+- Candidate completeness review for numbered parts/volumes before approval.
+- Configurable audiobook language root-folder mapping.
+- Read-only BookBuddy export diffing.
+- Local web UI for CSV upload, settings, planning, ingest, candidate review, approved export, filtering, activity display, stack connection testing, and monitored workflow execution.
+- Stack settings UI for Prowlarr, qBittorrent, optional SABnzbd/NZBGet, Audiobookshelf, optional Readarr, root folders, categories, and download/import modes.
+- CLI and web workflow orchestration from CSV through plan, ingest, Prowlarr aggregate search, candidate grouping, approval policy, Prowlarr grab, qBittorrent monitoring, import, and Audiobookshelf-path verification.
+- Workflow status CSV with `needs_review`, `needs_parts`, `grabbing`, `downloading`, `complete`, `complete_grouped`, and `blocked` states.
+- Repeatable Service deployment package under `deploy/service/`.
+- Dry-run-first Prowlarr Generic Torznab setup/update helper.
+- Secret-redacted Service health-check helper.
+- GitHub Actions CI for tests, CLI help checks, and Service script compilation.
 - Optional AudioBookBay Torznab bridge.
 - Deployed Service-stack bridge proof.
 - Prowlarr `AudioBookBay Bridge` indexer proof.
 - Readarr visibility proof.
 
-But it is not yet product-complete:
+Remaining product risks:
 
-- No one-command Service deployment.
-- No UI.
-- No automated safe matching/import flow.
-- No persisted match-review state.
-- No end-to-end "BookBuddy export -> approved audiobook request -> qBittorrent -> Audiobookshelf" flow.
+- The AudioBookBay-specific Torznab bridge currently authenticates correctly but returns zero results because upstream fetches time out from Service.
+- Prowlarr aggregate search works through other configured indexers and was used for actual-stack validation.
 - No production observability around bridge failures or noisy results.
+- qBittorrent credentials were exposed during manual Service inspection and should be rotated in qBittorrent plus dependent stack configs.
+- Current validation evidence must exclude any candidate later identified as a single part of a larger audiobook unless all parts are grouped together.
+- SABnzbd/NZBGet are not implemented as download monitors yet.
 
 ## Proven Live State
 
@@ -34,14 +50,32 @@ Local repo:
 - Path: `C:\Users\EnzoTERRIER\Codex\projects\BookBuddARR`
 - GitHub: `https://github.com/Nassau-1/BookBuddARR`
 - Latest known pushed commit: `6ba3ddb`
-- Tests: `python -m pytest tests` passes with 7 tests.
+- Tests: `python -m pytest tests` passes with 24 tests.
 
 Service VM:
 
 - `bookbuddarr-torznab` runs on port `8765`.
 - API key is stored on Service at `/srv/media-stack/compose/bookbuddarr-torznab.env`.
-- Prowlarr indexer `AudioBookBay Bridge` exists and passes test.
+- The BookBuddARR Torznab API key was rotated on 2026-07-02 after log exposure during validation.
+- Prowlarr has a configured qBittorrent download client named `qBittorrent VPN`.
+- Prowlarr aggregate search returned audiobook-category results from configured indexers.
 - Readarr sees `AudioBookBay Bridge (Prowlarr)`.
+
+Actual-stack validation on 2026-07-02:
+
+- Regenerated current-format audiobook review queue from the 143-row registry.
+- Created BookBuddARR review CSVs from Prowlarr aggregate search and qBittorrent completed audiobook-category items.
+- Approved 3 candidates through `bookbuddarr candidates approve`.
+- Exported approved candidates through `bookbuddarr candidates export-approved`.
+- Prowlarr successfully handed 3 approved torrent releases to qBittorrent.
+- Imported 3 completed qBittorrent audiobook-category items into `/mnt/nas/data/Audiobooks/Francais`.
+- Verified all 3 imports are visible through the Audiobookshelf container mount under `/audiobooks/Francais`.
+- Verified imported file counts through the Audiobookshelf mount: `3`, `60`, and `707` files.
+- Corrected multipart handling after identifying `Ainsi parlait Zarathoustra 1 - Le declin` as volume 1 only:
+  - Found volume 2, `Le Grand Midi`, through Prowlarr/qBittorrent.
+  - Approved it with the explicit incomplete override because all parts were being grouped together.
+  - Grouped the two completed parts into one French Audiobookshelf book folder.
+  - Verified the grouped folder through the Audiobookshelf mount with `214` files.
 
 BookBuddy export proof:
 
@@ -54,7 +88,7 @@ BookBuddy export proof:
 
 The intended final product is:
 
-> A self-hosted bridge that turns repeated BookBuddy exports into a reviewed, language-aware audiobook request pipeline for Arr-style stacks, with optional Torznab search routing through Prowlarr and safe handoff to qBittorrent/Audiobookshelf.
+> A self-hosted bridge that turns repeated BookBuddy exports into an approval-gated, language-aware audiobook workflow for Arr-style stacks, with Prowlarr aggregate search, qBittorrent monitoring, and Audiobookshelf-root import verification.
 
 ## Non-Goals For Now
 

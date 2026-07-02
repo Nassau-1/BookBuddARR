@@ -187,7 +187,8 @@ class TorznabHandler(BaseHTTPRequestHandler):
         self._send_xml(render_rss(results, self._self_url(parsed.path), query))
 
     def log_message(self, fmt: str, *args: object) -> None:
-        print(f"{self.address_string()} - {fmt % args}")
+        message = fmt % args
+        print(f"{self.address_string()} - {_redact_log_message(message)}")
 
     def _self_url(self, path: str) -> str:
         host = self.headers.get("Host", "127.0.0.1")
@@ -225,6 +226,10 @@ def parse_size_bytes(value: str) -> int:
 
 def _get_url(base_url: str, detail_url: str) -> str:
     return f"{base_url}?t=get&id={urllib.parse.quote(detail_url, safe='')}"
+
+
+def _redact_log_message(message: str) -> str:
+    return re.sub(r"([?&]apikey=)[^&\s]+", r"\1***redacted***", message, flags=re.I)
 
 
 def _xml(root: Element) -> bytes:

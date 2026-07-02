@@ -40,6 +40,7 @@ READARR_FIELDS = [
 ]
 
 AUDIOBOOK_SEARCH_FIELDS = [
+    "record_id",
     "title",
     "author",
     "isbn",
@@ -77,12 +78,19 @@ def write_readarr_queue(path: Path, records: list[BookRecord]) -> None:
     _write_rows(path, READARR_FIELDS, rows)
 
 
-def write_audiobook_search_queue(path: Path, records: list[BookRecord], base_url: str) -> None:
+def write_audiobook_search_queue(
+    path: Path,
+    records: list[BookRecord],
+    base_url: str,
+    *,
+    language_roots: dict[str, str] | None = None,
+) -> None:
     rows = []
     for record in records:
-        rule = audiobook_rule(record)
+        rule = audiobook_rule(record, language_roots=language_roots)
         rows.append(
             {
+                "record_id": record.record_id,
                 "title": record.title,
                 "author": record.author,
                 "isbn": record.isbn,

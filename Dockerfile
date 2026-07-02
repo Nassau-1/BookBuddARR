@@ -9,6 +9,6 @@ COPY bookbuddarr ./bookbuddarr
 
 RUN pip install --no-cache-dir .
 
-EXPOSE 8765
+EXPOSE 8765 8788
 
 CMD ["bookbuddarr", "torznab-serve", "--bind", "0.0.0.0", "--port", "8765"]

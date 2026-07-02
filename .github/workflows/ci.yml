@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install package
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e . pytest
+      - name: Run tests
+        run: python -m pytest tests
+      - name: Check CLI help
+        run: |
+          python -m bookbuddarr.cli --help
+          python -m bookbuddarr.cli ingest --help
+          python -m bookbuddarr.cli audiobook-search --help
+          python -m bookbuddarr.cli candidates --help
+          python -m bookbuddarr.cli diff-exports --help
+          python -m bookbuddarr.cli test-connections --help
+          python -m bookbuddarr.cli workflow --help
+          python -m bookbuddarr.cli torznab-serve --help
+          python -m bookbuddarr.cli web --help
+      - name: Compile Service scripts
+        run: python -m py_compile deploy\service\prowlarr_generic_torznab.py deploy\service\health_checks.py bookbuddarr\stack.py bookbuddarr\workflow.py

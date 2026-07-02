@@ -1,6 +1,6 @@
 # Product Backlog
 
-Date: 2026-07-01
+Date: 2026-07-02
 
 ## P0: Make The POC Product-Safe
 
@@ -18,6 +18,8 @@ Date: 2026-07-01
 - Add generated sample fixtures that are safe for public repo tests.
 
 ## P1: Audiobook-First Review Workflow
+
+Status: candidate search, CSV persistence, approval/rejection tooling, state preservation, and approved export are implemented.
 
 - Add a persistent `audiobook_matches.csv` or SQLite state:
   - book record id
@@ -44,6 +46,8 @@ Date: 2026-07-01
 
 ## P2: Service Deployment
 
+Status: compose/env template, install/update docs, dry-run-first Prowlarr helper, and health-check helper are implemented. Live Service changes remain operator-applied.
+
 - Add `deploy/service/compose.yaml`.
 - Add `deploy/service/README.md`.
 - Add `deploy/service/install.sh` or documented command sequence.
@@ -57,16 +61,20 @@ Date: 2026-07-01
   - Prowlarr indexer test
   - Readarr indexer visibility
 
-## P3: Readarr/Audiobookshelf Integration
+## P3: Downstream Integration
+
+Status: approved export, Prowlarr grab metadata, approval-gated workflow orchestration, qBittorrent monitoring, filesystem import, and Audiobookshelf-path verification are implemented. SABnzbd/NZBGet handoff remains TODO.
 
 - Keep ebook route WIP until audiobook workflow is stable.
 - Add Readarr dry-run lookup only:
   - Show metadata ambiguity.
   - Preserve BookBuddy language as source of truth.
-- Add Audiobookshelf "wanted" or collection export if API supports it safely.
-- Add a final "approved grab" path only after candidate review state exists.
+- Keep Audiobookshelf API mutation optional; filesystem import/visibility verification is the implemented path.
+- Keep approved grab paths gated by persisted candidate review state or explicit `approved_or_eligible` policy.
 
 ## P4: UX
+
+Status: local web UI exists for upload, settings, planning, ingest, candidate search, candidate approval/rejection, approved export, filtering, activity display, stack connection tests, and monitored workflow status. Auth remains future work if exposed beyond a trusted LAN/local host.
 
 - Add a small local web UI:
   - Upload/select BookBuddy export.
@@ -80,7 +88,7 @@ Date: 2026-07-01
 ## P5: Hardening
 
 - Package Docker image with version tags.
-- Add CI.
+- Add CI. Implemented with GitHub Actions for tests, CLI help, and Service script compilation.
 - Add type checking.
 - Add retry/rate-limit controls for AudioBookBay search.
 - Add structured logs.

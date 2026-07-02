@@ -7,10 +7,37 @@ from .models import BookRecord
 from .normalize import clean_text, language_code, normalize_isbn, stable_record_id
 
 
+REQUIRED_BOOKBUDDY_COLUMNS = [
+    "Title",
+    "Author",
+    "Language",
+    "ISBN",
+]
+
+
+class BookBuddyCsvError(ValueError):
+    pass
+
+
 def read_bookbuddy_export(path: Path) -> list[BookRecord]:
     with path.open("r", encoding="utf-8-sig", newline="") as handle:
         reader = csv.DictReader(handle)
+        validate_bookbuddy_columns(reader.fieldnames)
         return [_row_to_record(row) for row in reader]
+
+
+def validate_bookbuddy_columns(fieldnames: list[str] | None) -> None:
+    if fieldnames is None:
+        raise BookBuddyCsvError("BookBuddy CSV is missing a header row.")
+    missing = [field for field in REQUIRED_BOOKBUDDY_COLUMNS if field not in fieldnames]
+    if missing:
+        present = ", ".join(fieldnames) if fieldnames else "none"
+        required = ", ".join(REQUIRED_BOOKBUDDY_COLUMNS)
+        missing_text = ", ".join(missing)
+        raise BookBuddyCsvError(
+            f"BookBuddy CSV is missing required column(s): {missing_text}. "
+            f"Required columns: {required}. Present columns: {present}."
+        )
 
 
 def _row_to_record(row: dict[str, str]) -> BookRecord:
