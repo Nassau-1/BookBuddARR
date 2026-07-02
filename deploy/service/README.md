@@ -76,6 +76,8 @@ nano /srv/media-stack/compose/bookbuddarr-torznab.env
 Set real values for at least:
 
 - `BOOKBUDDARR_TORZNAB_API_KEY`
+- `BOOKBUDDARR_SRC`
+- `BOOKBUDDARR_ENV`
 - `PROWLARR_URL`
 - `PROWLARR_API_KEY`
 - `QBITTORRENT_URL`
