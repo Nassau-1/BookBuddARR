@@ -28,8 +28,9 @@ from .stack import StackSettings, test_connections
 from .workflow import WorkflowPaths, run_monitored_workflow
 
 
-SETTINGS_PATH = Path("data/bookbuddarr_settings.json")
-UPLOAD_DIR = Path("data/uploads")
+DATA_DIR = Path(os.environ.get("BOOKBUDDARR_DATA_DIR", "data"))
+SETTINGS_PATH = DATA_DIR / "bookbuddarr_settings.json"
+UPLOAD_DIR = DATA_DIR / "uploads"
 SECRET_FIELDS = {
     "torznab_api_key",
     "readarr_api_key",
@@ -42,12 +43,12 @@ SECRET_FIELDS = {
 
 
 DEFAULT_SETTINGS = {
-    "registry": "data/book_registry.csv",
-    "new_csv": "data/new_books.csv",
-    "readarr_csv": "data/readarr_queue.csv",
-    "audiobook_csv": "data/audiobook_search_queue.csv",
-    "matches_csv": "data/audiobook_matches.csv",
-    "approved_export_csv": "data/approved_audiobook_candidates.csv",
+    "registry": str(DATA_DIR / "book_registry.csv"),
+    "new_csv": str(DATA_DIR / "new_books.csv"),
+    "readarr_csv": str(DATA_DIR / "readarr_queue.csv"),
+    "audiobook_csv": str(DATA_DIR / "audiobook_search_queue.csv"),
+    "matches_csv": str(DATA_DIR / "audiobook_matches.csv"),
+    "approved_export_csv": str(DATA_DIR / "approved_audiobook_candidates.csv"),
     "audiobook_root_map": "",
     "torznab_url": "http://127.0.0.1:8765/api",
     "torznab_api_key": "",
@@ -70,11 +71,23 @@ DEFAULT_SETTINGS = {
     "audiobook_root_unknown": "/Data/Audiobooks",
     "download_mode": "approved_only",
     "import_mode": "copy",
-    "workflow_state_csv": "data/workflow_status.csv",
-    "activity_log": "data/workflow_activity.jsonl",
+    "workflow_state_csv": str(DATA_DIR / "workflow_status.csv"),
+    "activity_log": str(DATA_DIR / "workflow_activity.jsonl"),
     "candidate_score_threshold": "85",
     "readarr_url": "",
     "readarr_api_key": "",
+}
+
+
+DATA_PATH_SETTINGS = {
+    "registry",
+    "new_csv",
+    "readarr_csv",
+    "audiobook_csv",
+    "matches_csv",
+    "approved_export_csv",
+    "workflow_state_csv",
+    "activity_log",
 }
 
 
@@ -172,6 +185,7 @@ class WebHandler(BaseHTTPRequestHandler):
             "uploads": [str(path) for path in sorted(UPLOAD_DIR.glob("*.csv"), reverse=True)[:8]],
             "matches": _read_csv_preview(Path(settings["matches_csv"]), limit=20),
             "workflow": _read_csv_preview(Path(settings["workflow_state_csv"]), limit=40),
+            "workflow_summary": _csv_value_counts(Path(settings["workflow_state_csv"]), "state"),
             "approved_count": len(approved_matches(Path(settings["matches_csv"]))),
             "reviewOnly": settings.get("download_mode") == "approved_only",
         }
@@ -203,9 +217,7 @@ class WebHandler(BaseHTTPRequestHandler):
 
     def _doctor(self, payload: dict[str, Any]) -> dict[str, Any]:
         settings = _load_settings(self.settings_path)
-        export_path = Path(str(payload.get("export_csv") or ""))
-        if not export_path.exists():
-            raise ValueError("Upload or select a BookBuddy CSV first.")
+        export_path = _require_uploaded_csv(payload.get("export_csv"))
         records = read_bookbuddy_export(export_path)
         registry = Path(settings["registry"])
         return {
@@ -218,17 +230,13 @@ class WebHandler(BaseHTTPRequestHandler):
 
     def _plan(self, payload: dict[str, Any]) -> dict[str, Any]:
         settings = _load_settings(self.settings_path)
-        export_path = Path(str(payload.get("export_csv") or ""))
-        if not export_path.exists():
-            raise ValueError("Upload or select a BookBuddy CSV first.")
+        export_path = _require_uploaded_csv(payload.get("export_csv"))
         plan = build_plan(export_path, Path(settings["registry"]))
         return {"ok": True, "plan": plan.summary(registry_updated=False)}
 
     def _ingest(self, payload: dict[str, Any]) -> dict[str, Any]:
         settings = _load_settings(self.settings_path)
-        export_path = Path(str(payload.get("export_csv") or ""))
-        if not export_path.exists():
-            raise ValueError("Upload or select a BookBuddy CSV first.")
+        export_path = _require_uploaded_csv(payload.get("export_csv"))
         plan = build_plan(export_path, Path(settings["registry"]))
         root_map = load_audiobook_root_map(Path(settings["audiobook_root_map"])) if settings.get("audiobook_root_map") else None
         write_new_records(Path(settings["new_csv"]), plan.new_records)
@@ -290,9 +298,7 @@ class WebHandler(BaseHTTPRequestHandler):
 
     def _workflow(self, payload: dict[str, Any]) -> dict[str, Any]:
         settings = _load_settings(self.settings_path)
-        export_path = Path(str(payload.get("export_csv") or ""))
-        if not export_path.exists():
-            raise ValueError("Upload or select a BookBuddy CSV first.")
+        export_path = _require_uploaded_csv(payload.get("export_csv"))
         paths = WorkflowPaths(
             registry=Path(settings["registry"]),
             new_csv=Path(settings["new_csv"]),
@@ -342,6 +348,7 @@ def _load_settings(path: Path) -> dict[str, str]:
         for key in DEFAULT_SETTINGS:
             if key in data:
                 settings[key] = str(data[key])
+    _normalize_data_paths(settings)
     return settings
 
 
@@ -369,11 +376,41 @@ def _safe_settings(settings: dict[str, str]) -> dict[str, Any]:
     return safe
 
 
+def _normalize_data_paths(settings: dict[str, str]) -> None:
+    if DATA_DIR == Path("data"):
+        return
+    for key in DATA_PATH_SETTINGS:
+        value = settings.get(key, "").strip()
+        if value == "data":
+            settings[key] = str(DATA_DIR)
+            continue
+        if value.startswith("data/") or value.startswith("data\\"):
+            settings[key] = str(DATA_DIR / value[5:])
+
+
+def _require_uploaded_csv(value: object) -> Path:
+    path = Path(str(value or ""))
+    if not path.is_file():
+        raise ValueError("Upload or select a BookBuddy CSV first.")
+    return path
+
+
 def _read_csv_preview(path: Path, *, limit: int) -> list[dict[str, str]]:
     if not path.exists():
         return []
     with path.open("r", encoding="utf-8", newline="") as handle:
         return list(csv.DictReader(handle))[:limit]
+
+
+def _csv_value_counts(path: Path, field: str) -> dict[str, int]:
+    if not path.exists():
+        return {}
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        counts: dict[str, int] = {}
+        for row in csv.DictReader(handle):
+            value = row.get(field, "") or "unknown"
+            counts[value] = counts.get(value, 0) + 1
+    return dict(sorted(counts.items()))
 
 
 def _safe_filename(value: str) -> str:
@@ -412,7 +449,7 @@ APP_HTML = r"""<!doctype html>
     * { box-sizing: border-box; }
     body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; }
     button, input { font: inherit; }
-    .app { min-height: 100vh; display: grid; grid-template-columns: 240px 1fr; }
+    .app { min-height: 100vh; display: grid; grid-template-columns: 220px minmax(0, 1fr); }
     .sidebar { background: linear-gradient(180deg, #091520, #071018); border-right: 1px solid var(--line-soft); padding: 18px 10px; display: flex; flex-direction: column; gap: 22px; }
     .brand { display: flex; align-items: center; gap: 10px; padding: 0 10px 16px; border-bottom: 1px solid var(--line-soft); }
     .mark { width: 34px; height: 34px; border: 1px solid var(--accent); color: var(--accent); display: grid; place-items: center; border-radius: 4px; }
@@ -427,23 +464,37 @@ APP_HTML = r"""<!doctype html>
     .topbar { height: 52px; border-bottom: 1px solid var(--line-soft); display: flex; align-items: center; justify-content: space-between; padding: 0 18px; background: #0b1520; }
     .status { display: flex; align-items: center; gap: 12px; color: var(--muted); }
     .review { border: 1px solid #7454d8; color: #cfbfff; padding: 7px 12px; border-radius: 5px; font-weight: 600; font-size: 12px; }
-    main { padding: 18px; }
+    main { padding: 18px; max-width: 1180px; margin: 0 auto; }
     .title h1 { margin: 0; font-size: 22px; }
     .title p { margin: 6px 0 18px; color: var(--muted); }
-    .grid { display: grid; grid-template-columns: minmax(520px, 1.1fr) minmax(420px, .9fr); gap: 12px; }
+    .workflow-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
+    .step { border: 1px solid var(--line); background: #0d1925; border-radius: var(--radius); padding: 12px; display: grid; gap: 5px; min-height: 78px; }
+    .step strong { font-size: 13px; }
+    .step span { color: var(--muted); }
+    .step.ready { border-color: #2f7d5d; background: #0e211d; }
+    .step.warn { border-color: #806228; background: #241d0e; }
+    .grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
     .panel { background: linear-gradient(180deg, var(--panel), var(--panel-2)); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; }
     .panel h2 { margin: 0 0 14px; font-size: 16px; }
-    .drop { border: 1px dashed #516271; background: #0d1a27; border-radius: var(--radius); min-height: 142px; display: grid; place-items: center; text-align: center; color: var(--muted); cursor: pointer; }
+    .drop { border: 1px dashed #516271; background: #0d1a27; border-radius: var(--radius); min-height: 118px; display: grid; place-items: center; text-align: center; color: var(--muted); cursor: pointer; }
+    .drop.has-file { border-color: #2f7d5d; background: #0e211d; }
     .drop strong { color: var(--text); display: block; font-size: 16px; margin-bottom: 4px; }
     .drop span { color: var(--accent); }
     .file-row { margin-top: 10px; color: var(--muted); display: flex; justify-content: space-between; gap: 12px; }
     .summary { margin-top: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
     .metric { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--line-soft); }
     .metric strong { font-weight: 600; }
-    .actions { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-top: 16px; }
-    .actions button, .save { border: 1px solid #2c93b7; background: #102637; color: #75e7f3; border-radius: var(--radius); padding: 11px 10px; cursor: pointer; font-weight: 700; }
+    .actions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 16px; }
+    .actions button, .save { border: 1px solid #2c93b7; background: #102637; color: #75e7f3; border-radius: var(--radius); padding: 11px 10px; cursor: pointer; font-weight: 700; min-height: 44px; }
     .actions button.primary { border-color: #4d7efa; background: #17386f; color: #dbe8ff; }
     .actions button:disabled { opacity: .45; cursor: not-allowed; }
+    #workflowBtn { grid-column: span 2; }
+    .settings-panel { margin-top: 12px; }
+    .settings-panel > summary { cursor: pointer; font-weight: 800; list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .settings-panel > summary::-webkit-details-marker { display: none; }
+    .settings-panel > summary::after { content: "Open"; color: var(--accent); font-size: 12px; }
+    .settings-panel[open] > summary { margin-bottom: 14px; }
+    .settings-panel[open] > summary::after { content: "Close"; }
     .mini-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
     .mini-actions button { border: 1px solid #395a74; background: #102333; color: #d9edf7; border-radius: 4px; padding: 6px 8px; cursor: pointer; font-size: 12px; font-weight: 700; }
     .mini-actions button.approve { border-color: #3a894a; color: #bff5c5; }
@@ -466,13 +517,15 @@ APP_HTML = r"""<!doctype html>
     .pill.fr { border-color: #417c79; background: #113735; color: #74e5d9; }
     .pill.warn { border-color: #8f671e; background: #30240e; color: #f5be58; }
     .score { color: var(--good); font-weight: 700; }
-    .log { margin-top: 12px; min-height: 42px; border: 1px solid var(--line-soft); border-radius: var(--radius); padding: 10px; color: var(--muted); background: #09131d; white-space: pre-wrap; }
+    .log { margin-top: 12px; min-height: 42px; max-height: 260px; overflow: auto; border: 1px solid var(--line-soft); border-radius: var(--radius); padding: 10px; color: var(--muted); background: #09131d; white-space: pre-wrap; }
+    .log.error { color: #ffd0d0; border-color: #7a3737; background: #211011; }
     .hidden { display: none; }
     @media (max-width: 980px) {
       .app { grid-template-columns: 1fr; }
       .sidebar { display: none; }
-      .grid, .summary { grid-template-columns: 1fr; }
+      .grid, .summary, .workflow-strip { grid-template-columns: 1fr; }
       .actions { grid-template-columns: 1fr 1fr; }
+      #workflowBtn { grid-column: span 2; }
       .field { grid-template-columns: 1fr; }
       main { padding: 12px; }
     }
@@ -499,6 +552,11 @@ APP_HTML = r"""<!doctype html>
       <div class="topbar"><div class="status"><span>localhost web UI</span><span>v0.1</span></div><div class="review">APPROVAL-GATED MODE</div></div>
       <main>
         <div class="title"><h1>Import / CSV Workflow</h1><p>Upload a BookBuddy CSV export, configure stack links, then run the monitored audiobook workflow.</p></div>
+        <div class="workflow-strip">
+          <div id="stackStep" class="step"><strong>Stack</strong><span>Not tested yet</span></div>
+          <div id="csvStep" class="step"><strong>CSV</strong><span>No file selected</span></div>
+          <div id="runStep" class="step"><strong>Workflow</strong><span>Waiting for CSV</span></div>
+        </div>
         <div class="grid">
           <section class="panel">
             <h2>1. Upload BookBuddy CSV</h2>
@@ -528,26 +586,26 @@ APP_HTML = r"""<!doctype html>
               <button id="workflowBtn" class="primary">Run Workflow</button>
             </div>
           </section>
-          <section class="panel">
-            <h2>2. Import Settings</h2>
+          <details class="panel settings-panel">
+            <summary>2. Stack and Import Settings</summary>
             <div class="form" id="settingsForm"></div>
             <button id="saveBtn" class="save">Save Settings</button>
-          </section>
+          </details>
         </div>
         <section class="panel table-panel">
-          <div class="table-head"><h2>3. Candidate Review</h2><input id="filter" placeholder="Filter books, candidates, status..." /></div>
-          <table>
-            <thead><tr><th>Book</th><th>Language</th><th>Candidate</th><th>Score</th><th>Decision</th><th>Notes</th><th>Review</th></tr></thead>
-            <tbody id="matches"><tr><td colspan="7" class="muted">No candidate review rows yet.</td></tr></tbody>
-          </table>
-        </section>
-        <section class="panel table-panel">
-          <div class="table-head"><h2>4. Workflow Status</h2><span class="muted">pending, searching, grabbing, downloading, importing, complete, blocked, needs parts</span></div>
+          <div class="table-head"><h2>3. Workflow Status</h2><span class="muted">pending, searching, grabbing, downloading, importing, complete, blocked, needs parts</span></div>
           <table>
             <thead><tr><th>Book</th><th>State</th><th>Candidate</th><th>Parts</th><th>Target</th><th>Details</th></tr></thead>
             <tbody id="workflowRows"><tr><td colspan="6" class="muted">No workflow rows yet.</td></tr></tbody>
           </table>
           <div id="log" class="log">Ready.</div>
+        </section>
+        <section class="panel table-panel">
+          <div class="table-head"><h2>4. Candidate Review</h2><input id="filter" placeholder="Filter books, candidates, status..." /></div>
+          <table>
+            <thead><tr><th>Book</th><th>Language</th><th>Candidate</th><th>Score</th><th>Decision</th><th>Notes</th><th>Review</th></tr></thead>
+            <tbody id="matches"><tr><td colspan="7" class="muted">No candidate review rows yet.</td></tr></tbody>
+          </table>
         </section>
       </main>
     </section>
@@ -589,22 +647,44 @@ APP_HTML = r"""<!doctype html>
       ["readarr_api_key", "Readarr API Key", "password"],
     ];
     let currentExport = "";
+    let stackOk = false;
     let state = {};
 
     const $ = (id) => document.getElementById(id);
-    const log = (message) => $("log").textContent = typeof message === "string" ? message : JSON.stringify(message, null, 2);
+    const log = (message, kind = "info") => {
+      $("log").classList.toggle("error", kind === "error");
+      $("log").textContent = typeof message === "string" ? message : JSON.stringify(message, null, 2);
+    };
     const post = async (url, body) => {
       const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
       const data = await res.json();
       if (!res.ok || data.ok === false) throw new Error(data.error || "Request failed");
       return data;
     };
+    async function runAction(label, fn) {
+      log(label + "...");
+      setBusy(true);
+      try {
+        const data = await fn();
+        log(data);
+        await loadState();
+        return data;
+      } catch (error) {
+        log(error.message || String(error), "error");
+      } finally {
+        setBusy(false);
+        updateActionState();
+      }
+    }
 
     async function loadState() {
       state = await (await fetch("/api/state")).json();
       renderSettings(state.settings);
       renderMatches(state.matches || []);
       renderWorkflow(state.workflow || []);
+      restoreLatestUpload();
+      updateActionState();
+      renderSteps();
     }
 
     function renderSettings(settings) {
@@ -620,6 +700,43 @@ APP_HTML = r"""<!doctype html>
       const payload = {};
       for (const [key] of fields) payload[key] = $(key).value;
       return payload;
+    }
+    function restoreLatestUpload() {
+      if (currentExport || !(state.uploads || []).length) return;
+      currentExport = state.uploads[0];
+      $("fileName").textContent = currentExport.split(/[\\/]/).pop();
+      $("filePath").textContent = currentExport;
+      $("drop").classList.add("has-file");
+    }
+    function setBusy(value) {
+      document.querySelectorAll("button").forEach(button => button.disabled = value);
+    }
+    function updateActionState() {
+      const hasCsv = Boolean(currentExport);
+      for (const id of ["doctorBtn", "planBtn", "ingestBtn", "searchBtn", "workflowBtn"]) $(id).disabled = !hasCsv;
+      $("exportBtn").disabled = !(state.approved_count > 0);
+      $("saveBtn").disabled = false;
+      $("testBtn").disabled = false;
+    }
+    function renderSteps() {
+      const settings = state.settings || {};
+      const stackConfigured = Boolean(settings.prowlarr_url && settings.qbittorrent_url && settings.audiobookshelf_library_path);
+      const workflowSummary = state.workflow_summary || {};
+      const workflowTotal = Object.values(workflowSummary).reduce((sum, value) => sum + Number(value || 0), 0);
+      renderStep("stackStep", stackOk ? "ready" : (stackConfigured ? "warn" : ""), "Stack", stackOk ? "Connections passed" : (stackConfigured ? "Configured; run Test Stack" : "Configure Prowlarr, qBittorrent, Audiobookshelf"));
+      renderStep("csvStep", currentExport ? "ready" : "", "CSV", currentExport ? currentExport.split(/[\\/]/).pop() : "No file selected");
+      if (workflowTotal) {
+        const summaryText = Object.entries(workflowSummary).map(([key, value]) => `${value} ${key}`).join(", ");
+        const hasProblem = Boolean(workflowSummary.blocked || workflowSummary.needs_parts || workflowSummary.needs_review);
+        renderStep("runStep", hasProblem ? "warn" : "ready", "Workflow", summaryText);
+      } else {
+        renderStep("runStep", currentExport && stackConfigured ? "ready" : "", "Workflow", currentExport && stackConfigured ? "Ready to run" : "Waiting for CSV and stack");
+      }
+    }
+    function renderStep(id, cls, title, text) {
+      const node = $(id);
+      node.className = `step ${cls}`.trim();
+      node.innerHTML = `<strong>${esc(title)}</strong><span>${esc(text)}</span>`;
     }
 
     function renderPlan(plan) {
@@ -682,17 +799,37 @@ APP_HTML = r"""<!doctype html>
       currentExport = data.path;
       $("fileName").textContent = file.name;
       $("filePath").textContent = data.path;
+      $("drop").classList.add("has-file");
       log("Uploaded and validated header.");
+      updateActionState();
+      renderSteps();
     }
 
-    $("saveBtn").onclick = async () => { const data = await post("/api/settings", settingsPayload()); renderSettings(data.settings); log("Settings saved."); };
-    $("doctorBtn").onclick = async () => { log(await post("/api/doctor", { export_csv: currentExport })); };
-    $("planBtn").onclick = async () => { const data = await post("/api/plan", { export_csv: currentExport }); renderPlan(data.plan); log(data.plan); };
-    $("ingestBtn").onclick = async () => { const data = await post("/api/ingest", { export_csv: currentExport }); renderPlan(data.plan); log(data.plan); await loadState(); };
-    $("searchBtn").onclick = async () => { log("Searching audiobook candidates..."); const data = await post("/api/audiobook-search", {}); log(data); await loadState(); };
-    $("exportBtn").onclick = async () => { const data = await post("/api/export-approved", { output: $("approved_export_csv").value, format: "csv" }); log(data); await loadState(); };
-    $("testBtn").onclick = async () => { log("Testing stack connections..."); const data = await post("/api/test-connections", {}); log(data); await loadState(); };
-    $("workflowBtn").onclick = async () => { log("Running monitored workflow..."); const data = await post("/api/workflow", { export_csv: currentExport }); log(data); await loadState(); };
+    $("saveBtn").onclick = async () => runAction("Saving settings", async () => {
+      const data = await post("/api/settings", settingsPayload());
+      renderSettings(data.settings);
+      return { ok: true, message: "Settings saved." };
+    });
+    $("doctorBtn").onclick = async () => runAction("Checking CSV", () => post("/api/doctor", { export_csv: currentExport }));
+    $("planBtn").onclick = async () => runAction("Planning import", async () => {
+      const data = await post("/api/plan", { export_csv: currentExport });
+      renderPlan(data.plan);
+      return data.plan;
+    });
+    $("ingestBtn").onclick = async () => runAction("Ingesting CSV", async () => {
+      const data = await post("/api/ingest", { export_csv: currentExport });
+      renderPlan(data.plan);
+      return data.plan;
+    });
+    $("searchBtn").onclick = async () => runAction("Searching audiobook candidates", () => post("/api/audiobook-search", {}));
+    $("exportBtn").onclick = async () => runAction("Exporting approved candidates", () => post("/api/export-approved", { output: $("approved_export_csv").value, format: "csv" }));
+    $("testBtn").onclick = async () => runAction("Testing stack connections", async () => {
+      const data = await post("/api/test-connections", {});
+      stackOk = data.ok && Object.values(data.connections || {}).filter(item => item.configured && !item.optional).every(item => item.ok);
+      renderSteps();
+      return data;
+    });
+    $("workflowBtn").onclick = async () => runAction("Running monitored workflow", () => post("/api/workflow", { export_csv: currentExport }));
     async function reviewCandidate(action, record_id, candidate_url) {
       const notes = prompt(action === "approve" ? "Approval notes" : "Rejection notes", "") || "";
       const data = await post("/api/candidate-decision", { action, record_id, candidate_url, notes });

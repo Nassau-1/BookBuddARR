@@ -6,6 +6,8 @@ import json
 from pathlib import Path
 from urllib.request import Request
 
+import pytest
+
 from bookbuddarr.audiobook_search import candidates_from_prowlarr, classify_candidate_completeness, parse_torznab_rss, read_search_queue
 from bookbuddarr.bookbuddy import dedupe_records, read_bookbuddy_export
 from bookbuddarr.cli import main
@@ -1149,6 +1151,13 @@ def test_web_settings_redact_secret_values() -> None:
     assert safe["torznab_url"] == "http://127.0.0.1:8765/api"
     assert safe["torznab_api_key"] == ""
     assert safe["torznab_api_key_configured"] is True
+
+
+def test_web_rejects_missing_csv_path() -> None:
+    from bookbuddarr.web import _require_uploaded_csv
+
+    with pytest.raises(ValueError, match="Upload or select a BookBuddy CSV first"):
+        _require_uploaded_csv("")
 
 
 def test_web_html_exposes_upload_settings_and_review_only_ui() -> None:

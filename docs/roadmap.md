@@ -74,7 +74,7 @@ Scope:
 
 ## P3: Downstream Integration
 
-Status: approved candidate export, Prowlarr grab metadata, stack settings, connection tests, qBittorrent monitoring, filesystem import, and workflow status are implemented. Actual-stack validation completed on 2026-07-02 with 3 approved French audiobook imports visible through the Audiobookshelf mount and one multipart audiobook validated as `complete_grouped`.
+Status: approved candidate export, Prowlarr grab metadata, stack settings, connection tests, qBittorrent monitoring, filesystem import, and workflow status are implemented. Actual-stack validation completed on 2026-07-02 with 3 approved French audiobook imports visible through the Audiobookshelf mount and one multipart audiobook validated as `complete_grouped`. A later full real-CSV UI validation exposed a remaining P3 gap: candidate discovery returned zero candidates for the 143-row export, leaving all rows `blocked/no_candidates_found`.
 
 User-facing workflow:
 
@@ -96,6 +96,7 @@ Actual-stack validation note:
 - The AudioBookBay-specific bridge authenticated correctly but upstream fetches timed out from Service during validation.
 - qBittorrent credentials exposed during manual validation were rotated in qBittorrent and dependent stack config on 2026-07-02.
 - Final Service checks: BookBuddARR web returned HTTP `200`, unauthenticated Torznab caps returned HTTP `401`, and the Zarathoustra multipart workflow completed as `complete_grouped` with `verified_existing_grouped_import`.
+- Full-export check: upload, plan, and stack test passed for `BookBuddy 2026-07-01 224447.csv`, but `Run Workflow` produced `143 blocked` rows with `no_candidates_found`; see `docs/handoff/GOAL_PROMPT_REAL_CSV_WORKFLOW_FIX.md`.
 
 ## P4: UX and Hardening
 

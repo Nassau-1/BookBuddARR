@@ -4,7 +4,7 @@ Date: 2026-07-02
 
 ## Current Stage
 
-BookBuddARR is a **v1 approval-gated Docker product candidate with actual-stack live validation for the monitored automation flow**.
+BookBuddARR is a **v1 approval-gated Docker product candidate with actual-stack validation for selected approved rows, but the full real-CSV workflow still needs candidate-discovery work**.
 
 It has real working pieces:
 
@@ -38,6 +38,7 @@ Remaining product risks:
 
 - The AudioBookBay-specific Torznab bridge currently authenticates correctly but returns zero results because upstream fetches time out from Service.
 - Prowlarr aggregate search works through other configured indexers and was used for actual-stack validation.
+- Full real CSV validation on 2026-07-02 uploaded and planned the 143-row Askademy/BookBuddy export successfully, but `Run Workflow` produced `143 blocked` rows with `no_candidates_found` and zero candidate rows.
 - No production observability around bridge failures or noisy results.
 - qBittorrent credentials exposed during manual Service inspection were rotated in qBittorrent plus dependent stack configs on 2026-07-02.
 - SABnzbd/NZBGet are not implemented as download monitors yet.
@@ -81,6 +82,12 @@ Actual-stack validation on 2026-07-02:
   - Three approved non-multipart rows completed with workflow state `complete`.
   - The Zarathoustra multipart validation completed with workflow state `complete_grouped`.
   - The final multipart status detail was `verified_existing_grouped_import`, proving the workflow can verify an already-grouped Audiobookshelf import even after qBittorrent no longer lists the sibling torrents.
+- Real full-export UI validation after the selected-row validation:
+  - Upload of `BookBuddy 2026-07-01 224447.csv` succeeded to `/data/uploads/...`.
+  - Plan succeeded for `143` rows with language split `122` French, `20` English, `1` unknown.
+  - Stack test succeeded for Prowlarr, qBittorrent, and Audiobookshelf.
+  - Docker persistence was corrected so web outputs now write under `/data`.
+  - Full `Run Workflow` produced `143 blocked` rows with `no_candidates_found`; this is the next product gap tracked in `docs/handoff/GOAL_PROMPT_REAL_CSV_WORKFLOW_FIX.md`.
 
 BookBuddy export proof:
 

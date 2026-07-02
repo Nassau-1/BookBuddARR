@@ -7,6 +7,19 @@ Fresh-session finish prompts:
 - `docs/handoff/GOAL_PROMPT_FINISH_TODOS.md`
 - `docs/handoff/GOAL_PROMPT_LIVE_COMPLETION.md` for the Service/live validation phase.
 - `docs/handoff/GOAL_PROMPT_FULL_STACK_AUTOMATION.md` for the next product slice: Docker install, stack configuration, CSV drop, monitored search/grab/import, and multipart grouping.
+- `docs/handoff/GOAL_PROMPT_REAL_CSV_WORKFLOW_FIX.md` for the currently failing real-user CSV flow.
+
+## Current Gap From Real UI Validation
+
+- 2026-07-02 real browser-style validation with `C:\Users\EnzoTERRIER\Downloads\BookBuddy 2026-07-01 224447.csv`:
+  - Upload works.
+  - Plan works: `143` input rows, `143` unique rows, `122` French, `20` English, `1` unknown.
+  - Stack test works: Prowlarr and qBittorrent connect, Audiobookshelf verifies `/Data/Audiobooks`.
+  - Docker persistence was fixed so web outputs now go to `/data/...` instead of `/app/data/...`.
+  - Full `Run Workflow` does **not** satisfy the target product flow yet: it produced `143 blocked` rows with `no_candidates_found`.
+- Required next fix:
+  - Make the Prowlarr/search strategy produce useful candidate rows for the real Askademy/BookBuddy export, or clearly route rows to actionable review/search states instead of a dead-end all-blocked result.
+  - Keep the UI honest: if there are no candidates, the first viewport must say so, as it does now, but the product still needs a path to useful search/grab/import behavior for real CSVs.
 
 ## Completed Foundation Slice
 
