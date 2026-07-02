@@ -101,6 +101,18 @@ def run_monitored_workflow(
         if len(completed_parts) >= 2:
             status_rows.append(_import_completed_part_group(queue_row, rows_for_book[0], completed_parts, stack))
             continue
+        existing_group = _existing_grouped_import(stack, queue_row)
+        if existing_group is not None:
+            status_rows.append(
+                _status(
+                    queue_row,
+                    "complete_grouped",
+                    candidate=rows_for_book[0],
+                    details="verified_existing_grouped_import",
+                    target_path=str(existing_group),
+                )
+            )
+            continue
         if selected is None:
             multipart = _multipart_status(rows_for_book[0], rows_for_book)
             if multipart["state"] == "needs_parts":
@@ -346,6 +358,35 @@ def _import_completed_part_group(
         parts_found=",".join(sorted(completed_parts)),
         parts_missing="",
     )
+
+
+def _existing_grouped_import(stack: StackSettings, queue_row: Any) -> Path | None:
+    root = Path(stack.root_for_language(queue_row.language_code))
+    if not root.exists():
+        return None
+    keys = {_simple_key(queue_row.title), _simple_key(_strip_part_suffix(queue_row.title))}
+    keys = {key for key in keys if key}
+    best: tuple[int, Path] | None = None
+    for folder in root.rglob("*"):
+        if not folder.is_dir():
+            continue
+        folder_key = _simple_key(folder.name)
+        if not any(key in folder_key for key in keys):
+            continue
+        child_dirs = [item for item in folder.iterdir() if item.is_dir()]
+        part_markers = {_part_marker(item.name) for item in child_dirs}
+        if len({marker for marker in part_markers if marker}) >= 2:
+            score = 3
+        elif len(child_dirs) >= 2:
+            score = 2
+        else:
+            file_markers = {_part_marker(item.name) for item in folder.rglob("*") if item.is_file()}
+            score = 1 if len({marker for marker in file_markers if marker}) >= 2 else 0
+        if score and any(folder.rglob("*")):
+            candidate = (score, folder)
+            if best is None or candidate[0] > best[0]:
+                best = candidate
+    return best[1] if best else None
 
 
 def _simple_key(value: str) -> str:
