@@ -78,6 +78,7 @@ Set real values for at least:
 - `BOOKBUDDARR_TORZNAB_API_KEY`
 - `BOOKBUDDARR_SRC`
 - `BOOKBUDDARR_ENV`
+- `BOOKBUDDARR_NETWORK=mediaNet` and `BOOKBUDDARR_NETWORK_EXTERNAL=true` when sharing an existing Service Docker network with Prowlarr/qBittorrent/Audiobookshelf.
 - `PROWLARR_URL`
 - `PROWLARR_API_KEY`
 - `QBITTORRENT_URL`

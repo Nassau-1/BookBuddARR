@@ -70,6 +70,7 @@ services:
 networks:
   bookbuddarr:
     name: ${BOOKBUDDARR_NETWORK:-bookbuddarr}
+    external: ${BOOKBUDDARR_NETWORK_EXTERNAL:-false}
 
 volumes:
   bookbuddarr-data:
