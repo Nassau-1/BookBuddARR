@@ -52,6 +52,7 @@ services:
       - "${BOOKBUDDARR_WEB_PORT:-8788}:8788"
     volumes:
       - ${BOOKBUDDARR_DATA:-bookbuddarr-data}:/data
+      - ${BOOKBUDDARR_MEDIA:-bookbuddarr-media}:/Data
     networks:
       - bookbuddarr
     depends_on:
@@ -74,3 +75,4 @@ networks:
 
 volumes:
   bookbuddarr-data:
+  bookbuddarr-media:

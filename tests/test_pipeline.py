@@ -640,6 +640,71 @@ def test_workflow_marks_single_part_as_needs_parts(tmp_path: Path, monkeypatch) 
     assert rows[0]["parts_missing"] == "unknown"
 
 
+def test_workflow_imports_existing_completed_download_without_grab(tmp_path: Path, monkeypatch) -> None:
+    export = tmp_path / "export.csv"
+    completed = tmp_path / "completed" / "Dune - Frank Herbert VF"
+    completed.mkdir(parents=True)
+    (completed / "track.m4b").write_text("synthetic", encoding="utf-8")
+    target_root = tmp_path / "Audiobooks" / "Francais"
+    write_export(
+        export,
+        [
+            {"Title": "Dune", "Author": "Frank Herbert", "Language": "francais", "ISBN": "9780441172719"},
+        ],
+    )
+
+    def fake_search(settings: StackSettings, query: str):
+        return [
+            {
+                "title": "Dune - Frank Herbert VF",
+                "guid": "guid-1",
+                "indexerId": 9,
+                "infoUrl": "https://example.test/dune",
+                "language": "French",
+                "protocol": "torrent",
+            }
+        ]
+
+    def fake_completed(settings: StackSettings, title: str):
+        return {"name": "Dune - Frank Herbert VF", "content_path": str(completed), "progress": 1}
+
+    def fail_grab(*args, **kwargs):
+        raise AssertionError("workflow should not grab when completed qBittorrent item already exists")
+
+    monkeypatch.setattr("bookbuddarr.workflow.prowlarr_search", fake_search)
+    monkeypatch.setattr("bookbuddarr.workflow.find_completed_download", fake_completed)
+    monkeypatch.setattr("bookbuddarr.workflow.prowlarr_grab", fail_grab)
+
+    summary = run_monitored_workflow(
+        export,
+        paths=WorkflowPaths(
+            registry=tmp_path / "registry.csv",
+            new_csv=tmp_path / "new.csv",
+            readarr_csv=tmp_path / "readarr.csv",
+            audiobook_csv=tmp_path / "audio.csv",
+            matches_csv=tmp_path / "matches.csv",
+            workflow_status_csv=tmp_path / "workflow.csv",
+        ),
+        stack=StackSettings.from_mapping(
+            {
+                "prowlarr_url": "http://prowlarr.test",
+                "prowlarr_api_key": "secret",
+                "qbittorrent_url": "http://qbit.test",
+                "audiobook_root_fr": str(target_root),
+                "download_mode": "approved_or_eligible",
+                "candidate_score_threshold": 1,
+            }
+        ),
+    )
+
+    with (tmp_path / "workflow.csv").open(encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+
+    assert summary["states"] == {"complete": 1}
+    assert rows[0]["state"] == "complete"
+    assert (target_root / "Dune" / "track.m4b").exists()
+
+
 def test_audiobook_root_map_overrides_default_roots(tmp_path: Path) -> None:
     export = tmp_path / "export.csv"
     registry = tmp_path / "registry.csv"

@@ -90,7 +90,7 @@ http://127.0.0.1:8788
 
 Setup sequence:
 
-1. Configure required services in `.env` or the web UI: Prowlarr URL/API key, qBittorrent URL/credentials/category, Audiobookshelf library path/root folders.
+1. Configure required services in `.env` or the web UI: Prowlarr URL/API key, qBittorrent URL/credentials/category, Audiobookshelf library path/root folders, and `BOOKBUDDARR_MEDIA` if your host media root should be mounted as `/Data`.
 2. Optionally configure SABnzbd, NZBGet, Readarr, and the local Torznab bridge.
 3. Click `Test Stack` and confirm output is redacted.
 4. Upload a BookBuddy/Askademy Books-style CSV export.

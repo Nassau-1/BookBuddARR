@@ -112,16 +112,18 @@ def run_monitored_workflow(
         if multipart["state"] == "needs_parts":
             status_rows.append(_status(queue_row, "needs_parts", candidate=selected, details=multipart["details"], parts_found=multipart["parts_found"], parts_missing=multipart["parts_missing"]))
             continue
-        release = _release_from_match(selected)
-        grab = prowlarr_grab(stack, release, dry_run=dry_run) if stack.prowlarr_url else {"ok": False, "state": "blocked", "reason": "prowlarr_not_configured"}
-        _event(events, activity_path, "grab", {"record_id": queue_row.record_id, "state": grab.get("state"), "ok": grab.get("ok")})
-        if not grab.get("ok"):
-            status_rows.append(_status(queue_row, "blocked", candidate=selected, details=str(grab.get("reason") or grab.get("state"))))
-            continue
-        if dry_run or not stack.qbittorrent_url:
-            status_rows.append(_status(queue_row, "grabbing", candidate=selected, details=str(grab.get("state"))))
-            continue
-        completed = find_completed_download(stack, selected.get("candidate_title", ""))
+        completed = find_completed_download(stack, selected.get("candidate_title", "")) if stack.qbittorrent_url and not dry_run else None
+        if completed is None:
+            release = _release_from_match(selected)
+            grab = prowlarr_grab(stack, release, dry_run=dry_run) if stack.prowlarr_url else {"ok": False, "state": "blocked", "reason": "prowlarr_not_configured"}
+            _event(events, activity_path, "grab", {"record_id": queue_row.record_id, "state": grab.get("state"), "ok": grab.get("ok")})
+            if not grab.get("ok"):
+                status_rows.append(_status(queue_row, "blocked", candidate=selected, details=str(grab.get("reason") or grab.get("state"))))
+                continue
+            if dry_run or not stack.qbittorrent_url:
+                status_rows.append(_status(queue_row, "grabbing", candidate=selected, details=str(grab.get("state"))))
+                continue
+            completed = find_completed_download(stack, selected.get("candidate_title", ""))
         if completed is None:
             status_rows.append(_status(queue_row, "downloading", candidate=selected, details="waiting_for_qbittorrent_completion"))
             continue
