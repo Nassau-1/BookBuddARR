@@ -4,7 +4,7 @@ Date: 2026-07-02
 
 ## Current Stage
 
-BookBuddARR is a **v1 approval-gated Docker product candidate with prior actual-stack live validation and a new monitored automation flow awaiting final Service validation**.
+BookBuddARR is a **v1 approval-gated Docker product candidate with actual-stack live validation for the monitored automation flow**.
 
 It has real working pieces:
 
@@ -39,8 +39,7 @@ Remaining product risks:
 - The AudioBookBay-specific Torznab bridge currently authenticates correctly but returns zero results because upstream fetches time out from Service.
 - Prowlarr aggregate search works through other configured indexers and was used for actual-stack validation.
 - No production observability around bridge failures or noisy results.
-- qBittorrent credentials were exposed during manual Service inspection and should be rotated in qBittorrent plus dependent stack configs.
-- Current validation evidence must exclude any candidate later identified as a single part of a larger audiobook unless all parts are grouped together.
+- qBittorrent credentials exposed during manual Service inspection were rotated in qBittorrent plus dependent stack configs on 2026-07-02.
 - SABnzbd/NZBGet are not implemented as download monitors yet.
 
 ## Proven Live State
@@ -49,14 +48,16 @@ Local repo:
 
 - Path: `C:\Users\EnzoTERRIER\Codex\projects\BookBuddARR`
 - GitHub: `https://github.com/Nassau-1/BookBuddARR`
-- Latest known pushed commit: `6ba3ddb`
-- Tests: `python -m pytest tests` passes with 24 tests.
+- Latest known pushed commit: `90168d9`
+- Tests: `python -m pytest tests` passes with 33 tests.
 
 Service VM:
 
-- `bookbuddarr-torznab` runs on port `8765`.
+- `bookbuddarr-web` runs on port `8788` and returned HTTP `200` in final validation.
+- `bookbuddarr-torznab` runs on port `8765` and unauthenticated caps returned HTTP `401` in final validation.
 - API key is stored on Service at `/srv/media-stack/compose/bookbuddarr-torznab.env`.
 - The BookBuddARR Torznab API key was rotated on 2026-07-02 after log exposure during validation.
+- qBittorrent credentials were rotated on 2026-07-02 after manual validation exposure, and the Prowlarr download-client update tested successfully.
 - Prowlarr has a configured qBittorrent download client named `qBittorrent VPN`.
 - Prowlarr aggregate search returned audiobook-category results from configured indexers.
 - Readarr sees `AudioBookBay Bridge (Prowlarr)`.
@@ -76,6 +77,10 @@ Actual-stack validation on 2026-07-02:
   - Approved it with the explicit incomplete override because all parts were being grouped together.
   - Grouped the two completed parts into one French Audiobookshelf book folder.
   - Verified the grouped folder through the Audiobookshelf mount with `214` files.
+- Final monitored workflow validation on Service:
+  - Three approved non-multipart rows completed with workflow state `complete`.
+  - The Zarathoustra multipart validation completed with workflow state `complete_grouped`.
+  - The final multipart status detail was `verified_existing_grouped_import`, proving the workflow can verify an already-grouped Audiobookshelf import even after qBittorrent no longer lists the sibling torrents.
 
 BookBuddy export proof:
 

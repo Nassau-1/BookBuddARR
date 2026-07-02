@@ -36,19 +36,19 @@ Fresh-session finish prompts:
 - Add health-check commands for bridge, Prowlarr, and Readarr visibility.
 - Keep API keys in env files and redact secrets in script output.
 
-## Next Slice
+## Completed Full Stack Automation Slice
 
-- Validate and harden the target end-user flow on Service:
-  - Docker install comparable to Prowlarr/Radarr/Sonarr is implemented through `deploy/service/compose.yaml`.
-  - First-run setup screen for required stack URLs/API keys/root folders is implemented in the web UI.
-  - CSV drop from BookBuddy/Askademy Books-style export is implemented.
-  - One-click monitored run from CSV to candidate search, approval policy, Prowlarr grab, qBittorrent monitoring, import, and Audiobookshelf filesystem verification is implemented.
-  - Multipart detection blocks single parts as `needs_parts`; grouped completion requires sibling parts before `complete_grouped`.
-- Rotate qBittorrent credentials and update dependent stack configuration after manual validation exposed the old value.
-- Harden actual-stack validation into a repeatable command or operator runbook:
+- Docker install comparable to Prowlarr/Radarr/Sonarr is implemented through `deploy/service/compose.yaml`.
+- First-run setup screen for required stack URLs/API keys/root folders is implemented in the web UI.
+- CSV drop from BookBuddy/Askademy Books-style export is implemented.
+- One-click monitored run from CSV to candidate search, approval policy, Prowlarr grab, qBittorrent monitoring, import, and Audiobookshelf filesystem verification is implemented.
+- Multipart detection blocks single parts as `needs_parts`; grouped completion requires sibling parts before `complete_grouped`.
+- qBittorrent credentials exposed during manual validation were rotated and dependent stack configuration was updated.
+- Actual-stack validation completed on Service:
   - Prowlarr aggregate search candidate generation.
   - qBittorrent completed-item import into language roots.
   - Audiobookshelf mount verification.
+  - Zarathoustra multipart workflow verification as `complete_grouped`.
 
 ## Later
 
@@ -56,6 +56,7 @@ Fresh-session finish prompts:
 - Add SABnzbd/NZBGet handoff. Current settings and connection scaffolding are present; qBittorrent is the implemented monitor.
 - Add richer observability and retry/rate-limit controls for noisy or slow indexer searches.
 - Fix or replace the AudioBookBay-specific bridge source path if upstream Service fetches continue timing out.
+- Harden Service validation into a single repeatable operator command or runbook.
 
 ## Corrected During Validation
 

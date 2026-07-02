@@ -46,7 +46,7 @@ Status: candidate search, CSV persistence, approval/rejection tooling, state pre
 
 ## P2: Service Deployment
 
-Status: compose/env template, install/update docs, dry-run-first Prowlarr helper, and health-check helper are implemented. Live Service changes remain operator-applied.
+Status: compose/env template, install/update docs, dry-run-first Prowlarr helper, and health-check helper are implemented and validated on Service.
 
 - Add `deploy/service/compose.yaml`.
 - Add `deploy/service/README.md`.
@@ -63,7 +63,7 @@ Status: compose/env template, install/update docs, dry-run-first Prowlarr helper
 
 ## P3: Downstream Integration
 
-Status: approved export, Prowlarr grab metadata, approval-gated workflow orchestration, qBittorrent monitoring, filesystem import, and Audiobookshelf-path verification are implemented. SABnzbd/NZBGet handoff remains TODO.
+Status: approved export, Prowlarr grab metadata, approval-gated workflow orchestration, qBittorrent monitoring, filesystem import, Audiobookshelf-path verification, and multipart `complete_grouped` validation are implemented. SABnzbd/NZBGet handoff remains TODO.
 
 - Keep ebook route WIP until audiobook workflow is stable.
 - Add Readarr dry-run lookup only:
@@ -71,6 +71,7 @@ Status: approved export, Prowlarr grab metadata, approval-gated workflow orchest
   - Preserve BookBuddy language as source of truth.
 - Keep Audiobookshelf API mutation optional; filesystem import/visibility verification is the implemented path.
 - Keep approved grab paths gated by persisted candidate review state or explicit `approved_or_eligible` policy.
+- Keep multipart completion gated on sibling part discovery or existing grouped Audiobookshelf verification.
 
 ## P4: UX
 

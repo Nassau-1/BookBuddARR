@@ -14,6 +14,8 @@
 - Completed actual-stack Service validation through Prowlarr, qBittorrent, and the Audiobookshelf library mount for 3 approved French audiobook imports.
 - Rotated the BookBuddARR Torznab API key and redacted bridge API keys from request logs.
 - Added completeness review blocking for numbered part/volume audiobook candidates and corrected Zarathoustra by grouping volumes 1 and 2 in one Audiobookshelf folder.
+- Completed monitored workflow validation on Service for 3 non-multipart rows and 1 Zarathoustra multipart row, including `complete_grouped` verification of an existing grouped Audiobookshelf import.
+- Rotated exposed qBittorrent credentials and updated dependent Service stack configuration.
 
 ## 2026-07-01
 

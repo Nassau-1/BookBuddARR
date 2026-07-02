@@ -55,7 +55,7 @@ Scope:
 
 ## P2: Repeatable Service Deployment
 
-Status: compose/env template, install/update docs, Prowlarr setup/update helper, and health-check helper are implemented. Applying them to Service remains an explicit operator action.
+Status: compose/env template, install/update docs, Prowlarr setup/update helper, and health-check helper are implemented and validated on Service.
 
 User-facing workflow:
 
@@ -74,7 +74,7 @@ Scope:
 
 ## P3: Downstream Integration
 
-Status: approved candidate export, Prowlarr grab metadata, stack settings, connection tests, qBittorrent monitoring, filesystem import, and workflow status are implemented. Prior actual-stack validation completed on 2026-07-02 with 3 approved French audiobook imports visible through the Audiobookshelf mount; the new one-action flow still needs final Service validation.
+Status: approved candidate export, Prowlarr grab metadata, stack settings, connection tests, qBittorrent monitoring, filesystem import, and workflow status are implemented. Actual-stack validation completed on 2026-07-02 with 3 approved French audiobook imports visible through the Audiobookshelf mount and one multipart audiobook validated as `complete_grouped`.
 
 User-facing workflow:
 
@@ -94,7 +94,8 @@ Actual-stack validation note:
 
 - Prowlarr aggregate search and qBittorrent handoff were validated with the existing Service stack.
 - The AudioBookBay-specific bridge authenticated correctly but upstream fetches timed out from Service during validation.
-- qBittorrent credential rotation is required after manual inspection exposed the old value.
+- qBittorrent credentials exposed during manual validation were rotated in qBittorrent and dependent stack config on 2026-07-02.
+- Final Service checks: BookBuddARR web returned HTTP `200`, unauthenticated Torznab caps returned HTTP `401`, and the Zarathoustra multipart workflow completed as `complete_grouped` with `verified_existing_grouped_import`.
 
 ## P4: UX and Hardening
 
